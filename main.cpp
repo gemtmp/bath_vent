@@ -1,6 +1,7 @@
 #include <avr/interrupt.h>
 
 #include <iopins.h>
+#include <util/delay.h>
 
 #include "Clock.h"
 
@@ -25,7 +26,7 @@ public:
 			shortTime = now;
 			return false;
 		}
-		if ((now > shortTime ? now - shortTime : shortTime - now) > delay) {
+		if (Clock::delta(now, shortTime) > delay) {
 			on = true;
 			return true;
 		}
@@ -39,6 +40,7 @@ private:
 
 typedef IO::Pb5 Fan;
 typedef IO::Pb4 Heater;
+typedef IO::Pb3 Led;
 
 typedef Switch<IO::Pb2> Button;
 
@@ -50,13 +52,21 @@ int main(void)
 	Fan::Clear();
 	Heater::SetDirWrite();
 	Heater::Clear();
+	Led::SetDirWrite();
+	Led::Clear();
 
 	sei();
 
+	for (int i = 0; i < 5; i++) {
+		Led::Set();
+		_delay_ms(100);
+		Led::Clear();
+		_delay_ms(100);
+	}
 	Clock::start();
 
 	Button button;
-	Clock::clock_t start = 0;
+	Clock::clock_t start;
 	enum {
 		IDLE,
 		ON,
@@ -72,12 +82,14 @@ int main(void)
 				state = ON;
 				Fan::Set();
 				Heater::Set();
+				Led::Set();
 			}
 			break;
 		case ON:
 			if (!on) {
 				state = COOLING;
 				Heater::Clear();
+				Led::Clear();
 				start = Clock::millis();
 			}
 			break;
@@ -86,12 +98,14 @@ int main(void)
 				state = ON;
 				Fan::Set();
 				Heater::Set();
+				Led::Set();
 			} else {
 				Clock::clock_t now = Clock::millis();
-				if ((now > start ? now - start : start - now) > COOL_DELAY) {
+				if (Clock::delta(now, start) > COOL_DELAY) {
 					state = IDLE;
 					Fan::Clear();
 					Heater::Clear();
+					Led::Clear();
 				}
 			}
 			break;
